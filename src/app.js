@@ -11,7 +11,8 @@ import {
   getDocs,
   onSnapshot,
   doc,
-  deleteDoc
+  deleteDoc,
+  updateDoc
 } from 'firebase/firestore';
 import scrollIntoView from 'scroll-into-view-if-needed';
 
@@ -33,15 +34,52 @@ function createMessage() {
   const date = Timestamp.now();
   return { message, username, date };
 }
-
+//function to remove messages from UI on selected ID
 async function removeMessage(id) {
   const element = document.getElementById(id);
   await element.remove();
 }
-
+//function to delete messages from db on selected ID
 async function deleteMessage(id) {
   const docRef = doc(db, 'messages', id);
   await deleteDoc(docRef);
+}
+//function to modify messages in db on selected ID
+async function modifyMessage(id, newMessage) {
+  const docRef = doc(db, 'messages', id);
+  await updateDoc(docRef, { message: newMessage });
+}
+//function to modify messages in UI on selected ID
+async function setMessageText(id, newText) {
+  document.querySelector(`.message[id="${id}"] .message-text`).textContent = newText;
+}
+//function to display a popup textarea to modify messages
+function displayEditMessage(id) {
+  const editPopupHTML = /*html*/ `
+    <div class="popup-container" id="popup">
+      <div class="edit-message" id="edit-message" id="${id}">
+        <div id="close-popup" class="button">
+          Close <i class="fa fa-window-close" aria-hidden="true"></i>
+        </div>
+        <textarea id="edit" name="" cols="30" rows="10">${document
+          .querySelector(`.message[id="${id}"] .message-text`)
+          .textContent.trim()}</textarea>
+        <div id="save-message" class="button">
+          Save message<i class="fas fa-save"></i>
+        </div>
+      </div>
+    </div>
+`;
+  document.querySelector('#messages').insertAdjacentHTML('beforeend', editPopupHTML);
+  // close popup onclick the close btn
+  document.querySelector('#close-popup').addEventListener('click', function () {
+    document.getElementById('popup').remove();
+  });
+  //save the modify message and close the popup area onclick the save btn
+  document.querySelector('#save-message').addEventListener('click', function () {
+    modifyMessage(id, document.querySelector('#edit-message #edit').value);
+    document.getElementById('popup').remove();
+  });
 }
 
 /**
@@ -81,9 +119,14 @@ function displayMessage(message, id) {
     scrollMode: 'if-needed',
     block: 'end'
   });
+  //delete the selected message onclick the trash btn
   var x = document.querySelector(`[id="${id}"] .fa-trash-alt`);
   x.addEventListener('click', function () {
     deleteMessage(`${id}`);
+  });
+  //open the popup area with the original message to modify it
+  document.querySelector(`[id="${id}"] .fa-pen`).addEventListener('click', function () {
+    displayEditMessage(`${id}`);
   });
 }
 
@@ -110,7 +153,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // document.querySelector('#messages').innerHTML = '';
 
 let initialLoad = true;
-
+//change the datas on UI if data has changed (added, modified, removed) in db
 const q = query(collection(db, 'messages'), orderBy('date', 'asc'));
 onSnapshot(q, (snapshot) => {
   snapshot.docChanges().forEach((change) => {
@@ -122,6 +165,9 @@ onSnapshot(q, (snapshot) => {
     }
     if (change.type === 'modified') {
       console.log('Modified');
+      if (!initialLoad) {
+        setMessageText(change.doc.id, change.doc.data().message);
+      }
     }
     if (change.type === 'removed') {
       console.log('Removed');
