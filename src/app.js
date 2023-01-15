@@ -9,12 +9,13 @@ import {
   query,
   orderBy,
   getDocs,
-  onSnapshot
+  onSnapshot,
+  doc,
+  deleteDoc
 } from 'firebase/firestore';
 import scrollIntoView from 'scroll-into-view-if-needed';
 
 const app = initializeApp(config);
-
 const db = getFirestore(app);
 
 /**
@@ -33,6 +34,16 @@ function createMessage() {
   return { message, username, date };
 }
 
+async function removeMessage(id) {
+  const element = document.getElementById(id);
+  await element.remove();
+}
+
+async function deleteMessage(id) {
+  const docRef = doc(db, 'messages', id);
+  await deleteDoc(docRef);
+}
+
 /**
  * downloads all messages from the database and displays them ordered by date
  */
@@ -41,14 +52,14 @@ async function displayAllMessages() {
   const messages = await getDocs(q);
   document.querySelector('#messages').innerHTML = '';
   messages.forEach((doc) => {
-    displayMessage(doc.data());
+    displayMessage(doc.data(), doc.id);
   });
 }
 
-function displayMessage(message) {
+function displayMessage(message, id) {
   const dateFormat = message.date.toDate().toLocaleString('hu');
   const messageHTML = /*html*/ `
-    <div class="message">
+    <div class="message" id="${id}">
       <i class="fas fa-user"></i>
       <div>
         <span class="username">${message.username}
@@ -69,6 +80,10 @@ function displayMessage(message) {
   scrollIntoView(document.querySelector('#messages'), {
     scrollMode: 'if-needed',
     block: 'end'
+  });
+  var x = document.querySelector(`[id="${id}"] .fa-trash-alt`);
+  x.addEventListener('click', function () {
+    deleteMessage(`${id}`);
   });
 }
 
@@ -102,7 +117,7 @@ onSnapshot(q, (snapshot) => {
     if (change.type === 'added') {
       console.log('added');
       if (!initialLoad) {
-        displayMessage(change.doc.data());
+        displayMessage(change.doc.data(), change.doc.id);
       }
     }
     if (change.type === 'modified') {
@@ -110,6 +125,9 @@ onSnapshot(q, (snapshot) => {
     }
     if (change.type === 'removed') {
       console.log('Removed');
+      if (!initialLoad) {
+        removeMessage(change.doc.id);
+      }
     }
   });
   initialLoad = false;
